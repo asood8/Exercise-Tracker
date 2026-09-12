@@ -45,44 +45,12 @@
             android:padding="20dp">
 
             <TextView
-                android:id="@+id/curlsText"
+                android:id="@+id/exerciseBreakdownText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Curls: 0"
+                android:text="No reps recorded"
                 android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
-                android:id="@+id/pushupsText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Push-ups: 0"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
-                android:id="@+id/squatsText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Squats: 0"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
-                android:id="@+id/situpsText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sit-ups: 0"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
-                android:id="@+id/overheadText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Overhead Press: 0"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
+                android:lineSpacingExtra="8dp"/>
 
             <View
                 android:layout_width="match_parent"
@@ -112,7 +80,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <com.google.android.material.materialswitch.MaterialSwitch
+    <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/leaderboardSwitch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

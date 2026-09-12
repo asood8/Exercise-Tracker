@@ -6,6 +6,10 @@ data class RepResult(
     val feedback: List<String> = emptyList()
 )
 
+// Plank is tracked in seconds; show it as m:ss once it passes a minute
+fun formatPlankTime(seconds: Int): String =
+    if (seconds < 60) "${seconds}s" else "%d:%02d".format(seconds / 60, seconds % 60)
+
 class WorkoutSession {
     private val allReps = mutableListOf<RepResult>()
 

@@ -104,6 +104,7 @@ class HistoryActivity : AppCompatActivity() {
                 var totalOverhead = 0
                 var totalJacks = 0
                 var totalLunges = 0
+                var totalPlank = 0
                 var totalCalories = 0.0
                 var totalXp = 0
                 var scoreSum = 0
@@ -119,20 +120,20 @@ class HistoryActivity : AppCompatActivity() {
                     totalSquats += workout.squats
                     totalSitups += workout.situps
                     totalOverhead += workout.overhead
-                    
-                    // Note: You need to update the Workout data class to include these new ones
-                    // totalJacks += workout.jacks
-                    // totalLunges += workout.lunges
-                    
+                    totalJacks += workout.jacks
+                    totalLunges += workout.lunges
+                    totalPlank += workout.plank
+
                     totalCalories += workout.calories
-                    
+
                     if (workout.overallScore != -1) {
                         scoreSum += workout.overallScore
                         validScoreCount++
                     }
-                    
+
                     val qualityFactor = if (workout.overallScore == -1) 0.5 else workout.overallScore / 100.0
-                    val sessionReps = workout.curls + workout.pushups + workout.squats + workout.situps + workout.overhead
+                    // Plank counts as one rep per 10 seconds held
+                    val sessionReps = workout.totalReps + workout.plank / 10
                     totalXp += (sessionReps * 10 * qualityFactor).toInt()
 
                     workout.timestamp?.let { 
@@ -160,8 +161,8 @@ class HistoryActivity : AppCompatActivity() {
                 muscleChart.setStats(
                     arms = LevelingUtils.getMuscleProgress(totalCurls),
                     chest = LevelingUtils.getMuscleProgress(totalPushups),
-                    legs = LevelingUtils.getMuscleProgress(totalSquats),
-                    abs = LevelingUtils.getMuscleProgress(totalSitups),
+                    legs = LevelingUtils.getMuscleProgress(totalSquats + totalLunges),
+                    abs = LevelingUtils.getMuscleProgress(totalSitups + totalPlank / 10),
                     shoulders = LevelingUtils.getMuscleProgress(totalOverhead),
                     back = LevelingUtils.getMuscleProgress((totalCalories / 10).toInt())
                 )
@@ -171,6 +172,9 @@ class HistoryActivity : AppCompatActivity() {
                 findViewById<TextView>(R.id.totalSquats).text = "Total Squats: $totalSquats"
                 findViewById<TextView>(R.id.totalSitups).text = "Total Sit-ups: $totalSitups"
                 findViewById<TextView>(R.id.totalOverhead).text = "Total Overhead Press: $totalOverhead"
+                findViewById<TextView>(R.id.totalJacks).text = "Total Jumping Jacks: $totalJacks"
+                findViewById<TextView>(R.id.totalLunges).text = "Total Lunges: $totalLunges"
+                findViewById<TextView>(R.id.totalPlank).text = "Total Plank: ${formatPlankTime(totalPlank)}"
                 findViewById<TextView>(R.id.totalCalories).text = "Total Calories: %.1f kcal".format(totalCalories)
                 findViewById<TextView>(R.id.avgQualityScore).text = "Avg Quality Score: $avgScore%"
             }

@@ -106,7 +106,6 @@ Camera frames are processed on the phone and are never recorded or uploaded. Whe
 
 ## Roadmap
 
-- Show jumping jacks, lunges and plank time on the summary and history screens (they're already tracked and saved)
 - Hook up achievements. The milestone logic is written but doesn't have a screen yet.
 - Show levels on the leaderboard
 - Unit tests for the rep trackers

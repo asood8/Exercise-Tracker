@@ -2,6 +2,7 @@ package com.example.exercisetracker
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.Button
 import android.widget.RadioButton
@@ -13,6 +14,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlin.math.roundToInt
 
 class HomeActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
@@ -27,7 +29,8 @@ class HomeActivity : AppCompatActivity() {
 
         val usernameInput = findViewById<TextInputEditText>(R.id.usernameInput)
         val weightInput = findViewById<TextInputEditText>(R.id.weightInput)
-        val heightInput = findViewById<TextInputEditText>(R.id.heightInput)
+        val heightFeetInput = findViewById<TextInputEditText>(R.id.heightFeetInput)
+        val heightInchesInput = findViewById<TextInputEditText>(R.id.heightInchesInput)
         val ageInput = findViewById<TextInputEditText>(R.id.ageInput)
         val genderGroup = findViewById<RadioGroup>(R.id.genderGroup)
 
@@ -39,7 +42,9 @@ class HomeActivity : AppCompatActivity() {
         val sharedPrefs = getSharedPreferences("UserProfile", Context.MODE_PRIVATE)
         auth.currentUser?.let { usernameInput.setText(Username.get(this, it.uid)) }
         weightInput.setText(sharedPrefs.getString("WEIGHT", "130"))
-        heightInput.setText(sharedPrefs.getString("HEIGHT", "5.6"))
+        val (savedFeet, savedInches) = loadHeight(sharedPrefs)
+        heightFeetInput.setText(savedFeet)
+        heightInchesInput.setText(savedInches)
         ageInput.setText(sharedPrefs.getString("AGE", "18"))
         val savedGender = sharedPrefs.getString("GENDER", "male")
         if (savedGender == "female") {
@@ -76,11 +81,15 @@ class HomeActivity : AppCompatActivity() {
 
         nextButton.setOnClickListener {
             val weightStr = weightInput.text.toString()
-            val heightStr = heightInput.text.toString()
+            val feetStr = heightFeetInput.text.toString()
+            val inchesStr = heightInchesInput.text.toString()
             val ageStr = ageInput.text.toString()
 
             val weight = weightStr.toFloatOrNull() ?: 130f
-            val height = heightStr.toFloatOrNull() ?: 5.6f
+            val feet = feetStr.toIntOrNull() ?: 5
+            val inches = (inchesStr.toIntOrNull() ?: 0).coerceIn(0, 11)
+            // MainActivity takes height as decimal feet
+            val height = feet + inches / 12f
             val age = ageStr.toIntOrNull() ?: 18
 
             val selectedGenderId = genderGroup.checkedRadioButtonId
@@ -89,7 +98,9 @@ class HomeActivity : AppCompatActivity() {
             // Save values for next time
             sharedPrefs.edit().apply {
                 putString("WEIGHT", weightStr)
-                putString("HEIGHT", heightStr)
+                putString("HEIGHT_FT", feetStr)
+                putString("HEIGHT_IN", inchesStr)
+                remove("HEIGHT")
                 putString("AGE", ageStr)
                 putString("GENDER", gender)
                 apply()
@@ -117,6 +128,17 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    // Height used to be one decimal-feet field ("5.6"); older saves are converted to feet + inches
+    private fun loadHeight(prefs: SharedPreferences): Pair<String, String> {
+        val feet = prefs.getString("HEIGHT_FT", null)
+        val inches = prefs.getString("HEIGHT_IN", null)
+        if (feet != null && inches != null) return feet to inches
+
+        val legacyFeet = prefs.getString("HEIGHT", null)?.toFloatOrNull() ?: return "5" to "6"
+        val totalInches = (legacyFeet * 12).roundToInt()
+        return (totalInches / 12).toString() to (totalInches % 12).toString()
+    }
+
     private fun fetchQuickStats() {
         val user = auth.currentUser ?: return
 
@@ -135,6 +157,8 @@ class HomeActivity : AppCompatActivity() {
                     totalReps += (document.getLong("squats") ?: 0).toInt()
                     totalReps += (document.getLong("situps") ?: 0).toInt()
                     totalReps += (document.getLong("overhead") ?: 0).toInt()
+                    totalReps += (document.getLong("jacks") ?: 0).toInt()
+                    totalReps += (document.getLong("lunges") ?: 0).toInt()
 
                     totalCalories += document.getDouble("calories") ?: 0.0
                     scoreSum += (document.getLong("overallScore") ?: 0).toInt()

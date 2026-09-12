@@ -85,6 +85,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastActiveTime = 0L
     private val HIGHLIGHT_DURATION_MS = 5000L
 
+    // Trackers are updated on MediaPipe's result thread but read by endWorkout() on the UI thread
+    private val trackerLock = Any()
+    @Volatile private var workoutEnded = false
+
     companion object {
         private const val TAG = "LimbDetector"
         private const val REQUEST_CODE_PERMISSIONS = 10
@@ -196,6 +200,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun endWorkout() {
+        if (workoutEnded) return
+        // Stop processing frames, then read tracker state under the same lock the result thread uses
+        workoutEnded = true
+        imageAnalyzer?.clearAnalyzer()
+        val intent = synchronized(trackerLock) { buildSummaryIntent() }
+        startActivity(intent)
+        finish()
+    }
+
+    private fun buildSummaryIntent(): Intent {
         val allReps = mutableListOf<RepResult>()
         allReps.addAll(curlsTracker.sessionReps)
         allReps.addAll(pushUpTracker.sessionReps)
@@ -204,13 +218,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         allReps.addAll(overheadTracker.sessionReps)
         allReps.addAll(jumpingJackTracker.sessionReps)
         allReps.addAll(lungeTracker.sessionReps)
-        
-        val totalRepsCount = curlsTracker.curlCount + pushUpTracker.pushUpCount + 
-                             squatTracker.squatCount + situpTracker.situpCount + 
-                             overheadTracker.overheadCount + jumpingJackTracker.jackCount + 
-                             lungeTracker.lungeCount + (plankTracker.totalSeconds / 10) // Plank counts as "reps" for score
-        
-        val overallScore = if (totalRepsCount == 0) -1 else allReps.map { it.score }.average().toInt()
+
+        // Plank has no per-rep form score, so a plank-only session is N/A rather than 0%
+        val overallScore = if (allReps.isEmpty()) -1 else allReps.map { it.score }.average().toInt()
 
         val feedbackCountMap = mutableMapOf<String, Int>()
         allReps.forEach { rep ->
@@ -227,7 +237,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val feedbackSummary = if (topFeedback.isEmpty()) "Form: Excellent! Keep it up." 
                               else "Top issues: " + topFeedback.joinToString(", ")
 
-        val intent = Intent(this, SummaryActivity::class.java).apply {
+        return Intent(this, SummaryActivity::class.java).apply {
             putExtra("CURLS", curlsTracker.curlCount)
             putExtra("PUSHUPS", pushUpTracker.pushUpCount)
             putExtra("SQUATS", squatTracker.squatCount)
@@ -240,8 +250,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra("OVERALL_SCORE", overallScore)
             putExtra("FEEDBACK_SUMMARY", feedbackSummary)
         }
-        startActivity(intent)
-        finish()
     }
 
     private fun setupPoseLandmarker() {
@@ -267,15 +275,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun processLandmarkerResult(result: PoseLandmarkerResult, image: MPImage) {
-        curlsTracker.update(result)
-        pushUpTracker.update(result)
-        squatTracker.update(result)
-        situpTracker.update(result)
-        overheadTracker.update(result)
-        jumpingJackTracker.update(result)
-        lungeTracker.update(result)
-        plankTracker.update(result)
-        calorieEstimator.update(result, System.currentTimeMillis())
+        if (workoutEnded) return
+
+        synchronized(trackerLock) {
+            curlsTracker.update(result)
+            pushUpTracker.update(result)
+            squatTracker.update(result)
+            situpTracker.update(result)
+            overheadTracker.update(result)
+            jumpingJackTracker.update(result)
+            lungeTracker.update(result)
+            plankTracker.update(result)
+            calorieEstimator.update(result, System.currentTimeMillis())
+        }
         
         val currentTime = System.currentTimeMillis()
         

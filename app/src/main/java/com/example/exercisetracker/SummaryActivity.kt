@@ -7,7 +7,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
@@ -43,15 +43,18 @@ class SummaryActivity : AppCompatActivity() {
             scoreTextView.text = "Overall Score: $overallScore%"
         }
 
-        findViewById<TextView>(R.id.curlsText).text = "Curls: $curls"
-        findViewById<TextView>(R.id.pushupsText).text = "Push-ups: $pushups"
-        findViewById<TextView>(R.id.squatsText).text = "Squats: $squats"
-        findViewById<TextView>(R.id.situpsText).text = "Sit-ups: $situps"
-        findViewById<TextView>(R.id.overheadText).text = "Overhead Press: $overhead"
+        // Only list what was actually done this session
+        val breakdown = listOf(
+            "Push-ups" to pushups, "Squats" to squats, "Sit-ups" to situps, "Lunges" to lunges,
+            "Curls" to curls, "Overhead Press" to overhead, "Jumping Jacks" to jacks
+        ).filter { it.second > 0 }.map { (name, count) -> "$name: $count" }.toMutableList()
+        if (plank > 0) breakdown.add("Plank: ${formatPlankTime(plank)}")
+        findViewById<TextView>(R.id.exerciseBreakdownText).text =
+            if (breakdown.isEmpty()) "No reps recorded" else breakdown.joinToString("\n")
         findViewById<TextView>(R.id.caloriesText).text = "Total Calories: %.1f kcal".format(calories)
         findViewById<TextView>(R.id.feedbackSummaryText).text = feedbackSummary
 
-        val leaderboardSwitch = findViewById<MaterialSwitch>(R.id.leaderboardSwitch)
+        val leaderboardSwitch = findViewById<SwitchMaterial>(R.id.leaderboardSwitch)
 
         findViewById<Button>(R.id.saveButton).setOnClickListener {
             if (isRateLimited()) {
