@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 
 class HomeActivity : AppCompatActivity() {
@@ -24,17 +25,19 @@ class HomeActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
+        val usernameInput = findViewById<TextInputEditText>(R.id.usernameInput)
         val weightInput = findViewById<TextInputEditText>(R.id.weightInput)
         val heightInput = findViewById<TextInputEditText>(R.id.heightInput)
         val ageInput = findViewById<TextInputEditText>(R.id.ageInput)
         val genderGroup = findViewById<RadioGroup>(R.id.genderGroup)
-        
+
         val nextButton = findViewById<Button>(R.id.nextButton)
         val signOutButton = findViewById<Button>(R.id.signOutButton)
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottomNavigation)
 
         // Load saved user info
         val sharedPrefs = getSharedPreferences("UserProfile", Context.MODE_PRIVATE)
+        auth.currentUser?.let { usernameInput.setText(Username.get(this, it.uid)) }
         weightInput.setText(sharedPrefs.getString("WEIGHT", "130"))
         heightInput.setText(sharedPrefs.getString("HEIGHT", "5.6"))
         ageInput.setText(sharedPrefs.getString("AGE", "18"))
@@ -75,11 +78,11 @@ class HomeActivity : AppCompatActivity() {
             val weightStr = weightInput.text.toString()
             val heightStr = heightInput.text.toString()
             val ageStr = ageInput.text.toString()
-            
+
             val weight = weightStr.toFloatOrNull() ?: 130f
             val height = heightStr.toFloatOrNull() ?: 5.6f
             val age = ageStr.toIntOrNull() ?: 18
-            
+
             val selectedGenderId = genderGroup.checkedRadioButtonId
             val gender = if (selectedGenderId == R.id.genderFemale) "female" else "male"
 
@@ -90,6 +93,18 @@ class HomeActivity : AppCompatActivity() {
                 putString("AGE", ageStr)
                 putString("GENDER", gender)
                 apply()
+            }
+
+            auth.currentUser?.let { user ->
+                val username = Username.clean(usernameInput.text.toString(), user.uid)
+                usernameInput.setText(username)
+                if (username != Username.get(this, user.uid)) {
+                    Username.save(this, user.uid, username)
+                    // Rename an existing leaderboard entry. update() fails harmlessly if the user
+                    // never opted in, so this can't create an entry on its own.
+                    db.collection("users").document(user.uid)
+                        .update(mapOf("username" to username, "email" to FieldValue.delete()))
+                }
             }
 
             val intent = Intent(this, MainActivity::class.java).apply {
@@ -104,7 +119,7 @@ class HomeActivity : AppCompatActivity() {
 
     private fun fetchQuickStats() {
         val user = auth.currentUser ?: return
-        
+
         db.collection("workouts")
             .whereEqualTo("userId", user.uid)
             .get()
@@ -120,7 +135,7 @@ class HomeActivity : AppCompatActivity() {
                     totalReps += (document.getLong("squats") ?: 0).toInt()
                     totalReps += (document.getLong("situps") ?: 0).toInt()
                     totalReps += (document.getLong("overhead") ?: 0).toInt()
-                    
+
                     totalCalories += document.getDouble("calories") ?: 0.0
                     scoreSum += (document.getLong("overallScore") ?: 0).toInt()
                     count++

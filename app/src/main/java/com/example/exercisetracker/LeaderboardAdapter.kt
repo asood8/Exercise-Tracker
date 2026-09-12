@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 data class UserStats(
     val userId: String = "",
-    val email: String = "Anonymous",
+    val username: String = "",
     val totalReps: Int = 0,
     val totalCalories: Double = 0.0,
     val avgQuality: Int = 0,
@@ -33,7 +33,8 @@ class LeaderboardAdapter(private var users: List<UserStats>) :
     override fun onBindViewHolder(holder: LeaderboardViewHolder, position: Int) {
         val user = users[position]
         holder.rankText.text = "#${position + 1}"
-        holder.nameText.text = if (user.email.contains("@")) user.email.split("@")[0] else user.email
+        // Entries saved before usernames existed have none; never fall back to their email
+        holder.nameText.text = user.username.ifBlank { Username.defaultFor(user.userId) }
         holder.statsText.text = "${user.totalReps} reps | ${user.totalCalories.toInt()} kcal"
         holder.levelText.text = "Lvl ${user.level}"
     }

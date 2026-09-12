@@ -1,88 +1,117 @@
-\# AI Exercise Tracker
+# AI Exercise Tracker
 
+An Android app that counts your reps through the phone's camera. Prop your phone up, start moving, and it tracks push-ups, squats, curls and five other exercises, scores your form on every rep, and estimates how many calories you burned. There's nothing to log by hand.
 
+Pose detection runs entirely on the device with [MediaPipe](https://developers.google.com/mediapipe), so no video ever leaves your phone.
 
-A computer-vision fitness app that tracks your workouts automatically — no manual logging. Point your camera at yourself, start exercising, and the app counts your reps, estimates calories burned, and tracks your progress over time.
+<p align="center">
+  <img src="docs/screenshots/login.png" width="240" alt="Login screen with email sign-in and a guest option">
+  &nbsp;
+  <img src="docs/screenshots/home.png" width="240" alt="Workout settings screen with lifetime stats, username and body measurements">
+  &nbsp;
+  <img src="docs/screenshots/history.png" width="240" alt="Progress screen with level, muscle group radar chart and workout streak">
+</p>
 
+## Features
 
+- Rep counting for push-ups, squats, sit-ups, lunges, bicep curls, overhead press and jumping jacks, plus a hold timer for planks
+- A form score out of 100 for each rep, with live cues like "Go lower!" or "Keep chest up!" and optional spoken coaching
+- Calorie estimates based on how your body actually moves, adjusted for your weight, height, age and sex
+- A pinnable stats sidebar, so you can keep the exercises you care about on screen
+- Email/password accounts, or a guest mode if you just want to try it
+- A progress screen with lifetime totals, an XP and level system, your current daily streak, and a radar chart showing which muscle groups you've trained most
+- An opt-in public leaderboard ranked by total reps, where you show up under a username you pick
 
-\## Features
+## How it works
 
+Frames from the camera are downscaled and passed to MediaPipe's Pose Landmarker (the bundled `pose_landmarker_lite` model), which returns 33 body landmarks per frame.
 
+Each exercise has its own tracker class that turns those landmarks into joint angles and runs a small state machine. A squat, for example, goes standing → descending → bottom → ascending, and the rep counts when you're back up. At the end of each rep the tracker checks a few form rules (depth, torso lean, knee tracking and so on) and takes points off for each one you missed.
 
-\- \*\*Camera-based rep counting\*\* — Uses MediaPipe pose detection to track your body in real time and automatically count reps across a wide range of exercises, including pushups, squats, and many more.
+All trackers run on every frame, so you don't have to pick an exercise before you start. The app figures out what you're doing from whichever tracker is mid-rep.
 
-\- \*\*Physics-based calorie tracking\*\* — Estimates calories burned per exercise using a physics-based model rather than static lookup tables, personalized to your body metrics.
+Calories come from a simple physics model rather than a fixed calories-per-minute table. The app estimates your center of mass from the landmarks, weighting each body segment by its typical share of body mass. How fast that point moves is mapped to a MET value, which is converted to calories using your body weight. It's still an estimate, but it reacts to how hard you're actually working.
 
-\- \*\*Personalized profiles\*\* — Onboarding captures bodyweight, height, gender, and age to tailor calorie and progress calculations to each user.
+## Tech stack
 
-\- \*\*Flexible sign-in\*\* — Sign in with email and password, or jump in as a guest.
+- Kotlin with XML layouts
+- CameraX for the camera feed
+- MediaPipe Tasks Vision (Pose Landmarker) for on-device pose detection
+- Firebase Authentication and Cloud Firestore for accounts, workout history and the leaderboard
+- Gradle with the Kotlin DSL (AGP 8.3, min SDK 24, target SDK 34)
 
-\- \*\*Customizable display\*\* — Choose what stats and info you want visible during a workout.
+## Getting started
 
-\- \*\*Progress tracking\*\* — A dedicated history view shows:
+You'll need a recent version of Android Studio and an Android phone running Android 7.0 or later. A real device is strongly recommended: the app only ships ARM native libraries for MediaPipe, and pose tracking needs a decent camera feed anyway.
 
-&#x20; - A level system based on overall workout volume
+1. Clone the repo and open it in Android Studio.
 
-&#x20; - A spiderweb/radar graph visualizing how toned each muscle group is
+   ```
+   git clone https://github.com/asood8/Exercise-Tracker.git
+   ```
 
-&#x20; - Current and past workout streaks
+2. Set up Firebase. The app won't build without a `google-services.json`, which isn't checked in.
+   - Create a project in the [Firebase console](https://console.firebase.google.com/) and add an Android app with the package name `com.example.exercisetracker`.
+   - Download `google-services.json` and put it in the `app/` folder.
+   - Under **Authentication**, enable the **Email/Password** and **Anonymous** sign-in providers.
+   - Create a **Cloud Firestore** database. The rules below are a reasonable starting point: each user can only see and delete their own workouts, and leaderboard entries are readable by anyone signed in.
 
-&#x20; - Lifetime totals
+     ```
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{database}/documents {
+         match /workouts/{workoutId} {
+           allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+           allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+         }
+         match /users/{userId} {
+           allow read: if request.auth != null;
+           allow write: if request.auth != null && request.auth.uid == userId;
+         }
+       }
+     }
+     ```
 
-&#x20; - A log of recent workouts
+3. Sync Gradle and run the app on your phone. Grant camera access when it asks.
 
-\- \*\*Public leaderboard\*\* — Compete with other users, ranked by workout volume.
+To build from the command line instead, run `./gradlew assembleDebug` (or `gradlew.bat assembleDebug` on Windows). Gradle needs a JDK, so if `JAVA_HOME` isn't set, point it at the one bundled with Android Studio.
 
+## Getting good tracking
 
+- Put the phone far enough away that your whole body is in frame. Most trackers need to see everything from your shoulders down to your ankles.
+- Face the camera for curls, overhead press and jumping jacks. For floor exercises like push-ups, sit-ups and planks, a side-on view works better.
+- Good, even lighting helps a lot. Backlighting from a window is the most common reason tracking drops out.
+- The status bar at the top turns green once the app has found you.
 
-\## How It Works
+## Project structure
 
+```
+app/src/main/
+├── assets/pose_landmarker_lite.task     MediaPipe pose model
+├── java/com/example/exercisetracker/
+│   ├── MainActivity.kt                  camera, pose detection and the live workout screen
+│   ├── *Tracker.kt                      one rep counter per exercise
+│   ├── AngleUtils.kt                    joint angle math shared by the trackers
+│   ├── CalorieEstimator.kt              center-of-mass calorie model
+│   ├── LevelingUtils.kt                 XP, levels and muscle chart scaling
+│   ├── LoginActivity.kt, HomeActivity.kt, SummaryActivity.kt,
+│   │   HistoryActivity.kt, LeaderboardActivity.kt
+│   └── OverlayView.kt, MuscleStatsView.kt    custom views (skeleton overlay, radar chart)
+└── res/layout/                          XML layouts
+```
 
+## Privacy
 
-The app uses \[MediaPipe Pose](https://developers.google.com/mediapipe) to extract body landmark coordinates from the live camera feed. These landmarks are analyzed frame-by-frame to detect exercise-specific motion patterns (e.g., the up/down cycle of a pushup or squat), which drives the rep counter. Calorie estimates come from a physics-based model that factors in body weight, movement, and exercise type, rather than relying on generic calories-per-minute tables.
+Camera frames are processed on the phone and are never recorded or uploaded. When you save a workout, the app stores your rep counts, calories, form score and a timestamp in Firestore under your account. You only appear on the leaderboard if you turn on "Appear on Global Rankings" when saving, and it shows the username you set on the home screen, never your email.
 
+## Roadmap
 
+- Show jumping jacks, lunges and plank time on the summary and history screens (they're already tracked and saved)
+- Hook up achievements. The milestone logic is written but doesn't have a screen yet.
+- Show levels on the leaderboard
+- Unit tests for the rep trackers
+- Publish on the Google Play Store
 
-\_\[Optional: expand this section with more detail — e.g., how the app distinguishes between exercise types, specifics of the physics model, any performance optimizations for real-time tracking]\_
+## License
 
-
-
-\## Tech Stack
-
-
-
-\_\[Fill in: language/framework (e.g., Kotlin + Android MediaPipe SDK, Swift + iOS MediaPipe SDK, React Native, Flutter), backend/auth provider, database]\_
-
-
-
-\## Screenshots / Demo
-
-
-
-\_\[Add screenshots or a short demo GIF/video here — for an app like this, visuals will sell it better than any text]\_
-
-
-
-\## Getting Started
-
-
-
-\_\[Fill in setup/installation instructions once the stack above is confirmed — e.g., clone the repo, install dependencies, build/run steps]\_
-
-
-
-\## Roadmap
-
-
-
-\- \[ ] Publish to the Google Play Store
-
-
-
-\---
-
-
-
-\*Adjust tone and section order as you like — this is meant as a solid starting skeleton, not a final draft.\*
-
+Released under the [MIT License](LICENSE).

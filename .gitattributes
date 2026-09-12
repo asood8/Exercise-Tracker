@@ -1,0 +1,16 @@
+# Store text files with LF in the repo; Git converts to native endings on checkout
+* text=auto
+
+# Shell scripts must keep LF or they won't run on macOS/Linux
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Windows batch files need CRLF
+*.bat text eol=crlf
+
+# Binaries
+*.jar binary
+*.task binary
+*.png binary
+*.webp binary
+*.gif binary

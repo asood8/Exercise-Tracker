@@ -114,7 +114,7 @@ class SummaryActivity : AppCompatActivity() {
             .add(workout)
             .addOnSuccessListener {
                 if (shouldShare) {
-                    updateLeaderboardStats(user.uid, user.email ?: "Anonymous", curls + pushups + squats + situps + overhead + jacks + lunges, calories, score)
+                    updateLeaderboardStats(user.uid, Username.get(this, user.uid), curls + pushups + squats + situps + overhead + jacks + lunges, calories, score)
                 } else {
                     onSaveComplete()
                 }
@@ -126,12 +126,14 @@ class SummaryActivity : AppCompatActivity() {
             }
     }
 
-    private fun updateLeaderboardStats(uid: String, email: String, sessionReps: Int, sessionCalories: Double, sessionScore: Int) {
+    private fun updateLeaderboardStats(uid: String, username: String, sessionReps: Int, sessionCalories: Double, sessionScore: Int) {
         val userRef = db.collection("users").document(uid)
-        
+
         // Use increment to update global totals
         val updates = hashMapOf(
-            "email" to email,
+            "username" to username,
+            // Older versions stored the account email here; remove it since leaderboard docs are public
+            "email" to FieldValue.delete(),
             "totalReps" to FieldValue.increment(sessionReps.toLong()),
             "totalCalories" to FieldValue.increment(sessionCalories),
             "lastActive" to FieldValue.serverTimestamp()
