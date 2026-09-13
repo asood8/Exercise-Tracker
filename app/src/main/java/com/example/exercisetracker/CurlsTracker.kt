@@ -1,16 +1,31 @@
 package com.example.exercisetracker
 
+import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import kotlin.math.abs
-import kotlin.math.sqrt
-import kotlin.math.acos
 
-class CurlsTracker {
-    var curlCount = 0
-    private var stage: String? = null
-    private var minElbowAngle = Double.MAX_VALUE
-    private var maxElbowAngle = 0.0
-    var inCurlMotion = false
+// Tracks each arm separately, so two-arm, alternating and one-arm curls all count.
+// curlCount is reps per arm: the higher of the two arms' counts.
+class CurlsTracker(private val isMirrored: () -> Boolean = { true }) {
+
+    private class Arm(val shoulder: Int, val elbow: Int, val wrist: Int, val hip: Int) {
+        var count = 0
+        var stage: String? = null
+        var minElbowAngle = Double.MAX_VALUE
+        var maxElbowAngle = 0.0
+        var inMotion = false
+        var angle: Double? = null
+        var swinging = false
+        var elbowForward = true
+        val repTimer = RepTimer()
+    }
+
+    // MediaPipe's left/right are anatomical, so on a mirrored (front camera) frame they're swapped
+    private val landmarkLeft = Arm(shoulder = 11, elbow = 13, wrist = 15, hip = 23)
+    private val landmarkRight = Arm(shoulder = 12, elbow = 14, wrist = 16, hip = 24)
+
+    val curlCount: Int get() = maxOf(landmarkLeft.count, landmarkRight.count)
+    val inCurlMotion: Boolean get() = landmarkLeft.inMotion || landmarkRight.inMotion
     val feedback = mutableListOf<String>()
 
     // Scoring
@@ -23,150 +38,112 @@ class CurlsTracker {
     private val minContractionRequired = 70.0
     private val maxExtensionRequired = 140.0
     private val maxShoulderSwing = 0.15f
-    private val maxUpperArmAngle = 100.0
 
     fun update(result: PoseLandmarkerResult): Int {
         val landmarks = result.landmarks().firstOrNull() ?: return curlCount
 
-        val leftElbowAngle = AngleUtils.getAngle(result, 11, 13, 15)
-        val rightElbowAngle = AngleUtils.getAngle(result, 12, 14, 16)
+        var anyArmVisible = false
+        for (arm in listOf(landmarkLeft, landmarkRight)) {
+            val angle = if (isArmVisible(landmarks, arm)) {
+                AngleUtils.getAngle(result, arm.shoulder, arm.elbow, arm.wrist)
+            } else null
+            arm.angle = angle
+            if (angle == null) continue
 
-        val (side, elbowAngle) = when {
-            leftElbowAngle != null && checkForm(landmarks, 11, 13, 15) -> "left" to leftElbowAngle
-            rightElbowAngle != null && checkForm(landmarks, 12, 14, 16) -> "right" to rightElbowAngle
-            else -> {
-                feedback.clear()
-                feedback.add("Arm not visible - face camera")
-                return curlCount
-            }
+            anyArmVisible = true
+            arm.swinging = calculateShoulderOffset(landmarks, arm) > maxShoulderSwing
+            arm.elbowForward = isElbowForward(landmarks, arm)
+            updateArm(arm, angle)
         }
 
-        val shoulderIdx = if (side == "left") 11 else 12
-        val elbowIdx = if (side == "left") 13 else 14
-        val hipIdx = if (side == "left") 23 else 24
-
-        val shoulderOffset = calculateShoulderAlignment(landmarks, shoulderIdx, hipIdx)
-        val upperArmAngle = calculateUpperArmAngle(landmarks, shoulderIdx, elbowIdx, hipIdx)
-        val armForward = isArmForward(landmarks, side)
-
-        when (stage) {
-            null, "down" -> {
-                if (elbowAngle > extendedThreshold) {
-                    stage = "down"
-                    minElbowAngle = Double.MAX_VALUE
-                    maxElbowAngle = elbowAngle
-                    inCurlMotion = false
-                } else if (elbowAngle < extendedThreshold) {
-                    stage = "curling"
-                    minElbowAngle = elbowAngle
-                    inCurlMotion = true
-                }
-            }
-            "curling" -> {
-                minElbowAngle = minOf(minElbowAngle, elbowAngle)
-                if (elbowAngle < contractedThreshold) stage = "up"
-            }
-            "up" -> {
-                if (elbowAngle > contractedThreshold) {
-                    stage = "extending"
-                    maxElbowAngle = elbowAngle
-                }
-            }
-            "extending" -> {
-                maxElbowAngle = maxOf(maxElbowAngle, elbowAngle)
-                if (elbowAngle > extendedThreshold) {
-                    validateRep(shoulderOffset, upperArmAngle, armForward)
-                }
-            }
+        if (!anyArmVisible) {
+            feedback.clear()
+            feedback.add("Arm not visible - face camera")
+            return curlCount
         }
 
-        updateLiveFeedback(elbowAngle, shoulderOffset, upperArmAngle, armForward)
+        updateLiveFeedback()
         return curlCount
     }
 
-    private fun checkForm(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>, sIdx: Int, eIdx: Int, wIdx: Int): Boolean {
-        val s = landmarks[sIdx]
-        val e = landmarks[eIdx]
-        val w = landmarks[wIdx]
-        
-        val sVis = if (s.visibility().isPresent) s.visibility().get() else 0f
-        val eVis = if (e.visibility().isPresent) e.visibility().get() else 0f
-        val wVis = if (w.visibility().isPresent) w.visibility().get() else 0f
-        
-        return sVis > 0.5f && eVis > 0.5f && wVis > 0.5f
+    private fun updateArm(arm: Arm, angle: Double) {
+        when (arm.stage) {
+            null, "down" -> {
+                if (angle > extendedThreshold) {
+                    arm.stage = "down"
+                    arm.minElbowAngle = Double.MAX_VALUE
+                    arm.maxElbowAngle = angle
+                    arm.inMotion = false
+                } else if (angle < extendedThreshold) {
+                    arm.stage = "curling"
+                    arm.minElbowAngle = angle
+                    arm.inMotion = true
+                    arm.repTimer.start()
+                }
+            }
+            "curling" -> {
+                arm.minElbowAngle = minOf(arm.minElbowAngle, angle)
+                if (angle < contractedThreshold) arm.stage = "up"
+            }
+            "up" -> {
+                if (angle > contractedThreshold) {
+                    arm.stage = "extending"
+                    arm.maxElbowAngle = angle
+                }
+            }
+            "extending" -> {
+                arm.maxElbowAngle = maxOf(arm.maxElbowAngle, angle)
+                if (angle > extendedThreshold) {
+                    validateRep(arm)
+                }
+            }
+        }
     }
 
-    private fun calculateShoulderAlignment(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>, sIdx: Int, hIdx: Int): Float {
-        val s = landmarks[sIdx]
-        val h = landmarks[hIdx]
-        val sVis = if (s.visibility().isPresent) s.visibility().get() else 0f
-        val hVis = if (h.visibility().isPresent) h.visibility().get() else 0f
-        
-        return if (sVis > 0.5f && hVis > 0.5f) abs(s.x() - h.x()) else 0f
+    private fun visibility(landmark: NormalizedLandmark): Float =
+        if (landmark.visibility().isPresent) landmark.visibility().get() else 0f
+
+    private fun isArmVisible(landmarks: List<NormalizedLandmark>, arm: Arm): Boolean =
+        listOf(arm.shoulder, arm.elbow, arm.wrist).all { visibility(landmarks[it]) > 0.5f }
+
+    // Horizontal shoulder-to-hip offset; a large one means the body is swinging to lift the weight
+    private fun calculateShoulderOffset(landmarks: List<NormalizedLandmark>, arm: Arm): Float {
+        val s = landmarks[arm.shoulder]
+        val h = landmarks[arm.hip]
+        return if (visibility(s) > 0.5f && visibility(h) > 0.5f) abs(s.x() - h.x()) else 0f
     }
 
-    private fun calculateUpperArmAngle(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>, sIdx: Int, eIdx: Int, hIdx: Int): Double? {
-        val s = landmarks[sIdx]
-        val e = landmarks[eIdx]
-        val h = landmarks[hIdx]
-        
-        val sVis = if (s.visibility().isPresent) s.visibility().get() else 0f
-        val eVis = if (e.visibility().isPresent) e.visibility().get() else 0f
-        val hVis = if (h.visibility().isPresent) h.visibility().get() else 0f
-        
-        if (sVis < 0.5f || eVis < 0.5f || hVis < 0.5f) return null
+    private fun isElbowForward(landmarks: List<NormalizedLandmark>, arm: Arm): Boolean {
+        val s = landmarks[arm.shoulder]
+        val e = landmarks[arm.elbow]
+        if (visibility(s) < 0.5f || visibility(e) < 0.5f) return true
 
-        val torsoX = (s.x() - h.x()).toDouble()
-        val torsoY = (s.y() - h.y()).toDouble()
-        val armX = (e.x() - s.x()).toDouble()
-        val armY = (e.y() - s.y()).toDouble()
-
-        val dotProduct = torsoX * armX + torsoY * armY
-        val magTorso = sqrt(torsoX * torsoX + torsoY * torsoY)
-        val magArm = sqrt(armX * armX + armY * armY)
-
-        return if (magTorso > 0 && magArm > 0) {
-            val cosAngle = (dotProduct / (magTorso * magArm)).coerceIn(-1.0, 1.0)
-            Math.toDegrees(acos(cosAngle))
-        } else null
+        // Use Z-depth: the elbow should be level with or slightly in front of the shoulder.
+        // Allow it to sit a little behind, but not significantly.
+        return s.z() - e.z() > -0.1f
     }
 
-    private fun isArmForward(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>, side: String): Boolean {
-        val sIdx = if (side == "left") 11 else 12
-        val eIdx = if (side == "left") 13 else 14
-        val s = landmarks[sIdx]
-        val e = landmarks[eIdx]
-        
-        val sVis = if (s.visibility().isPresent) s.visibility().get() else 0f
-        val eVis = if (e.visibility().isPresent) e.visibility().get() else 0f
-        
-        if (sVis < 0.5f || eVis < 0.5f) return true
+    private fun validateRep(arm: Arm) {
+        arm.stage = "down"
+        arm.inMotion = false
+        if (arm.repTimer.isTooFast()) return
 
-        // IMPROVED LOGIC: Use Z-depth instead of X-axis
-        // Elbow should be slightly closer to camera (smaller Z) or equal to shoulder
-        val depthDiff = s.z() - e.z()
-        
-        // Tolerance: allow elbow to be slightly behind shoulder, but not significantly
-        return depthDiff > -0.1f 
-    }
-
-    private fun validateRep(shoulderOffset: Float, upperArmAngle: Double?, armForward: Boolean) {
         var score = 100
         val repFeedback = mutableListOf<String>()
 
-        if (minElbowAngle > minContractionRequired) {
+        if (arm.minElbowAngle > minContractionRequired) {
             score -= 30
             repFeedback.add("Curl higher!")
         }
-        if (maxElbowAngle < maxExtensionRequired) {
+        if (arm.maxElbowAngle < maxExtensionRequired) {
             score -= 30
             repFeedback.add("Extend fully!")
         }
-        if (shoulderOffset > maxShoulderSwing) {
+        if (arm.swinging) {
             score -= 20
             repFeedback.add("Don't swing!")
         }
-        if (!armForward) {
+        if (!arm.elbowForward) {
             score -= 10
             repFeedback.add("Keep elbow forward")
         }
@@ -174,19 +151,23 @@ class CurlsTracker {
         score = score.coerceIn(0, 100)
         lastRepScore = score
         sessionReps.add(RepResult("Curls", score, repFeedback))
-        curlCount++
-        stage = "down"
-        inCurlMotion = false
+        arm.count++
     }
 
-    private fun updateLiveFeedback(angle: Double, shoulderOffset: Float, upperArmAngle: Double?, armForward: Boolean) {
+    private fun updateLiveFeedback() {
+        val (userLeft, userRight) = if (isMirrored()) landmarkRight to landmarkLeft else landmarkLeft to landmarkRight
+
         feedback.clear()
         feedback.add("Curls: $curlCount (Last: $lastRepScore%)")
-        feedback.add("Angle: ${angle.toInt()}°")
-        if (inCurlMotion) {
-            // Only show "Bring elbow forward" if significantly out of position
-            if (!armForward) feedback.add("⚠ Bring elbow forward!")
-            if (shoulderOffset > maxShoulderSwing) feedback.add("⚠ Don't swing!")
-        }
+        feedback.add("Left ${userLeft.count} · Right ${userRight.count}")
+        val angles = listOfNotNull(
+            userLeft.angle?.let { "L ${it.toInt()}°" },
+            userRight.angle?.let { "R ${it.toInt()}°" }
+        )
+        feedback.add("Angle: " + angles.joinToString(" · "))
+
+        val moving = listOf(landmarkLeft, landmarkRight).filter { it.inMotion }
+        if (moving.any { !it.elbowForward }) feedback.add("⚠ Bring elbow forward!")
+        if (moving.any { it.swinging }) feedback.add("⚠ Don't swing!")
     }
 }

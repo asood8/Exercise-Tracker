@@ -16,6 +16,7 @@ class SquatTracker {
     // Scoring
     var lastRepScore = 0
     val sessionReps = mutableListOf<RepResult>()
+    private val repTimer = RepTimer()
 
     // Thresholds
     private val downThreshold = 100.0
@@ -67,6 +68,7 @@ class SquatTracker {
                     stage = "descending"
                     minKneeAngle = avgKneeAngle
                     inSquatMotion = true
+                    repTimer.start()
                 }
             }
 
@@ -129,8 +131,9 @@ class SquatTracker {
         val dx = shoulderMidX - hipMidX
         val dy = shoulderMidY - hipMidY
 
-        // Angle from vertical (0 degrees = perfectly upright)
-        return abs(Math.toDegrees(atan2(dx.toDouble(), dy.toDouble())))
+        // Angle from vertical (0 degrees = perfectly upright). y grows downward, so dy is negative
+        // when standing; use magnitudes so upright reads as 0 rather than 180.
+        return Math.toDegrees(atan2(abs(dx).toDouble(), abs(dy).toDouble()))
     }
 
     private fun checkKneeAlignment(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>): Boolean {
@@ -154,6 +157,12 @@ class SquatTracker {
     }
 
     private fun validateRep(torsoAngle: Double?, hipDrop: Float, kneeAlignment: Boolean) {
+        if (repTimer.isTooFast()) {
+            stage = "up"
+            inSquatMotion = false
+            return
+        }
+
         var score = 100
         val repFeedback = mutableListOf<String>()
 

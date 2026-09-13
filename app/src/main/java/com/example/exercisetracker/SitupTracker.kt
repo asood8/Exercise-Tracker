@@ -17,6 +17,7 @@ class SitupTracker {
     // Scoring
     var lastRepScore = 0
     val sessionReps = mutableListOf<RepResult>()
+    private val repTimer = RepTimer()
 
     // Thresholds
     private val downThreshold = 60.0   // Lying flat
@@ -69,6 +70,7 @@ class SitupTracker {
                     stage = "rising"
                     maxAbAngle = abAngle
                     inSitupMotion = true
+                    repTimer.start()
                 }
             }
 
@@ -185,6 +187,12 @@ class SitupTracker {
     }
 
     private fun validateRep(neckAngle: Double?, hipLift: Float) {
+        if (repTimer.isTooFast()) {
+            stage = "down"
+            inSitupMotion = false
+            return
+        }
+
         var score = 100
         val repFeedback = mutableListOf<String>()
 

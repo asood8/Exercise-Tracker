@@ -4,7 +4,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212">
+    android:background="#121212"
+    android:keepScreenOn="true">
 
     <!-- Stats Display Area -->
     <androidx.core.widget.NestedScrollView
@@ -79,6 +80,54 @@
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- Set progress, only shown when a goal was set on Home -->
+    <LinearLayout
+        android:id="@+id/goalPanel"
+        android:layout_width="140dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/cameraCard"
+        app:layout_constraintStart_toStartOf="@id/cameraCard"
+        app:layout_constraintEnd_toEndOf="@id/cameraCard">
+
+        <FrameLayout
+            android:layout_width="110dp"
+            android:layout_height="110dp">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/goalRing"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                app:indicatorSize="110dp"
+                app:trackThickness="8dp"
+                app:indicatorColor="#BB86FC"
+                app:trackColor="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/goalRingText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="0/15"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/goalSetText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Set 1 of 3"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+    </LinearLayout>
+
     <!-- Sidebar Controls -->
     <LinearLayout
         android:layout_width="wrap_content"
@@ -105,7 +154,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_manage"
             app:tint="@android:color/white"
-            android:contentDescription="Exercise Filter" />
+            android:contentDescription="Change exercise" />
 
         <ImageButton
             android:id="@+id/soundButton"
@@ -116,6 +165,16 @@
             android:src="@android:drawable/ic_lock_silent_mode_off"
             app:tint="@android:color/white"
             android:contentDescription="Toggle Sound" />
+
+        <ImageButton
+            android:id="@+id/pauseButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_pause"
+            app:tint="@android:color/white"
+            android:contentDescription="Pause workout" />
     </LinearLayout>
 
     <Button

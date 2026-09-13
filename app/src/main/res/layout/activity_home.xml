@@ -134,6 +134,48 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Only shown to guest (anonymous) accounts -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/guestBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/purple_500"
+                app:strokeWidth="1dp"
+                app:layout_constraintTop_toBottomOf="@id/quickStatsCard">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="You're using a guest account"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Create an account to keep your workouts if you sign out or switch phones."
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/createAccountButton"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Create account" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/usernameInputLayout"
                 android:layout_width="match_parent"
@@ -141,7 +183,7 @@
                 android:layout_marginTop="24dp"
                 android:hint="Username"
                 app:helperText="Shown on the leaderboard"
-                app:layout_constraintTop_toBottomOf="@id/quickStatsCard">
+                app:layout_constraintTop_toBottomOf="@id/guestBanner">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/usernameInput"
@@ -151,13 +193,40 @@
                     android:maxLength="20" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/unitsToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                app:singleSelection="true"
+                app:selectionRequired="true"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/usernameInputLayout">
+
+                <Button
+                    android:id="@+id/unitsImperial"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="lb / ft"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/unitsMetric"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="kg / cm"
+                    android:textAllCaps="false" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/weightInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:hint="Weight (lb)"
-                app:layout_constraintTop_toBottomOf="@id/usernameInputLayout">
+                app:layout_constraintTop_toBottomOf="@id/unitsToggle">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/weightInput"
@@ -167,6 +236,7 @@
                     android:text="130" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Feet + inches in imperial, a single cm field in metric -->
             <LinearLayout
                 android:id="@+id/heightInputLayout"
                 android:layout_width="match_parent"
@@ -176,6 +246,7 @@
                 app:layout_constraintTop_toBottomOf="@id/weightInputLayout">
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/heightFeetLayout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -191,6 +262,7 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/heightInchesLayout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
@@ -204,6 +276,22 @@
                         android:inputType="number"
                         android:maxLength="2"
                         android:text="6" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/heightCmLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Height (cm)"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/heightCmInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="3" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
@@ -255,23 +343,80 @@
             </RadioGroup>
 
             <TextView
-                android:id="@+id/supportedExercisesLabel"
+                android:id="@+id/exerciseLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Supported Exercises"
+                android:text="Exercise"
                 android:layout_marginTop="24dp"
                 android:textStyle="bold"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/genderGroup" />
 
-            <TextView
-                android:id="@+id/supportedExercisesList"
+            <!-- Filled with one chip per exercise in HomeActivity -->
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/exerciseChips"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Push-ups · Squats · Sit-ups · Lunges · Curls · Overhead Press · Jumping Jacks · Planks"
                 android:layout_marginTop="8dp"
-                android:lineSpacingExtra="4dp"
-                app:layout_constraintTop_toBottomOf="@id/supportedExercisesLabel" />
+                app:singleSelection="true"
+                app:selectionRequired="true"
+                app:layout_constraintTop_toBottomOf="@id/exerciseLabel" />
+
+            <TextView
+                android:id="@+id/goalLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Goal (optional)"
+                android:layout_marginTop="16dp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/exerciseChips" />
+
+            <LinearLayout
+                android:id="@+id/goalRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/goalLabel">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Sets">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/goalSetsInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="2" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="12dp"
+                    android:text="×"
+                    android:textSize="20sp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/goalTargetLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Reps per set">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/goalTargetInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="3" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
 
             <Button
                 android:id="@+id/nextButton"
@@ -282,7 +427,7 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginBottom="32dp"
                 app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/supportedExercisesList"
+                app:layout_constraintTop_toBottomOf="@id/goalRow"
                 app:layout_constraintVertical_bias="1.0" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>

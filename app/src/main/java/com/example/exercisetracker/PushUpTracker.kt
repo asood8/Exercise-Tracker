@@ -18,6 +18,7 @@ class PushUpTracker {
     // Scoring
     var lastRepScore = 0
     val sessionReps = mutableListOf<RepResult>()
+    private val repTimer = RepTimer()
 
     // Thresholds
     private val downThreshold = 90.0
@@ -80,6 +81,7 @@ class PushUpTracker {
                     stage = "descending"
                     minElbowAngle = avgElbowAngle
                     inPushUpMotion = true
+                    repTimer.start()
                 }
             }
 
@@ -168,6 +170,12 @@ class PushUpTracker {
     }
 
     private fun validateRep(bodyAngle: Double?, hipSag: Float, handRatio: Float) {
+        if (repTimer.isTooFast()) {
+            stage = "up"
+            inPushUpMotion = false
+            return
+        }
+
         var score = 100
         val repFeedback = mutableListOf<String>()
 

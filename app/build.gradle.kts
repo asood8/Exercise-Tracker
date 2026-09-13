@@ -66,6 +66,9 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
+    // Background work (streak reminders)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     // Import the Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
 

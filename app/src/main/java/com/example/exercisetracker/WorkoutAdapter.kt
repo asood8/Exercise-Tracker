@@ -22,6 +22,7 @@ data class Workout(
     val plank: Int = 0, // seconds
     val calories: Double = 0.0,
     val overallScore: Int = 0,
+    val durationSeconds: Int = 0, // 0 for workouts saved before durations were recorded
     val timestamp: com.google.firebase.Timestamp? = null
 ) {
     // Rep-based exercises only; plank is time-based
@@ -63,6 +64,7 @@ class WorkoutAdapter(
         if (workout.jacks > 0) details.add("Jacks: ${workout.jacks}")
         if (workout.lunges > 0) details.add("Lunges: ${workout.lunges}")
         if (workout.plank > 0) details.add("Plank: ${formatPlankTime(workout.plank)}")
+        if (workout.durationSeconds > 0) details.add("Time: ${formatDuration(workout.durationSeconds)}")
         details.add("Calories: %.1f".format(workout.calories))
 
         holder.detailsText.text = details.joinToString(", ")

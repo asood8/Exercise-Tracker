@@ -101,6 +101,69 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Weekly Activity Chart -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Last 8 Weeks"
+                        android:textStyle="bold"
+                        android:textSize="16sp" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/chartToggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:checkedButton="@id/chartReps"
+                        app:singleSelection="true"
+                        app:selectionRequired="true">
+
+                        <Button
+                            android:id="@+id/chartReps"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Reps"
+                            android:textAllCaps="false" />
+
+                        <Button
+                            android:id="@+id/chartCalories"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Calories"
+                            android:textAllCaps="false" />
+
+                        <Button
+                            android:id="@+id/chartMinutes"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Minutes"
+                            android:textAllCaps="false" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                    <com.example.exercisetracker.WeeklyChartView
+                        android:id="@+id/weeklyChart"
+                        android:layout_width="match_parent"
+                        android:layout_height="180dp"
+                        android:layout_marginTop="12dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Streak and All-Time Stats -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -121,8 +184,23 @@
                         android:layout_height="wrap_content"
                         android:text="🔥 0 Day Streak"
                         android:textStyle="bold"
-                        android:textSize="20sp"
-                        android:layout_marginBottom="16dp"/>
+                        android:textSize="20sp" />
+
+                    <TextView
+                        android:id="@+id/bestStreakText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Best: 0 days"
+                        android:textSize="14sp" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/streakReminderSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="12dp"
+                        android:text="Remind me to keep my streak" />
 
                     <TextView
                         android:id="@+id/totalCurls"
@@ -189,6 +267,14 @@
                         android:layout_marginBottom="8dp"/>
 
                     <TextView
+                        android:id="@+id/totalTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Total Workout Time: 0:00"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="8dp"/>
+
+                    <TextView
                         android:id="@+id/totalCalories"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -205,6 +291,79 @@
                         android:textStyle="bold"
                         android:textColor="@color/design_default_color_primary"/>
 
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Achievements -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:background="#1A1A1A">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🏅 Achievements"
+                        android:textColor="@android:color/white"
+                        android:textStyle="bold"
+                        android:textSize="20sp" />
+
+                    <TextView
+                        android:id="@+id/achievementsCountText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="8dp"
+                        android:text="0 unlocked"
+                        android:textColor="#BBBBBB"
+                        android:textSize="14sp" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/achievementsRecyclerView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Personal Records -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🏆 Personal Records"
+                        android:textStyle="bold"
+                        android:textSize="20sp"
+                        android:layout_marginBottom="12dp" />
+
+                    <TextView
+                        android:id="@+id/personalRecordsText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Save a workout to start setting records."
+                        android:textSize="16sp"
+                        android:lineSpacingExtra="8dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

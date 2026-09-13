@@ -17,6 +17,7 @@ class OverheadTracker {
     // Scoring
     var lastRepScore = 0
     val sessionReps = mutableListOf<RepResult>()
+    private val repTimer = RepTimer()
 
     // Thresholds
     private val downThreshold = 60.0      // Hands at shoulders
@@ -74,6 +75,7 @@ class OverheadTracker {
                     stage = "pressing"
                     maxElbowAngle = avgElbowAngle
                     inPressMotion = true
+                    repTimer.start()
                 }
             }
 
@@ -191,6 +193,12 @@ class OverheadTracker {
         backArch: Float,
         wristAlignment: Boolean
     ) {
+        if (repTimer.isTooFast()) {
+            stage = "down"
+            inPressMotion = false
+            return
+        }
+
         var score = 100
         val repFeedback = mutableListOf<String>()
 

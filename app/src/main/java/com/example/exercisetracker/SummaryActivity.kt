@@ -3,6 +3,7 @@ package com.example.exercisetracker
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -35,12 +36,28 @@ class SummaryActivity : AppCompatActivity() {
         val calories = intent.getDoubleExtra("CALORIES", 0.0)
         val overallScore = intent.getIntExtra("OVERALL_SCORE", -1)
         val feedbackSummary = intent.getStringExtra("FEEDBACK_SUMMARY") ?: "No feedback available."
+        val durationSeconds = intent.getIntExtra("DURATION", 0)
+        val goalSummary = intent.getStringExtra("GOAL_SUMMARY")
 
         val scoreTextView = findViewById<TextView>(R.id.overallScore)
         if (overallScore == -1) {
             scoreTextView.text = "Overall Score: N/A"
         } else {
             scoreTextView.text = "Overall Score: $overallScore%"
+        }
+
+        // Session length and goal progress, when there is any
+        val sessionInfo = mutableListOf<String>()
+        if (durationSeconds > 0) {
+            val minutes = durationSeconds / 60.0
+            var timeLine = "Time: ${formatDuration(durationSeconds)}"
+            if (minutes >= 1 && calories > 0) timeLine += " · %.1f kcal/min".format(calories / minutes)
+            sessionInfo.add(timeLine)
+        }
+        goalSummary?.let { sessionInfo.add(it) }
+        findViewById<TextView>(R.id.sessionInfoText).apply {
+            text = sessionInfo.joinToString("\n")
+            visibility = if (sessionInfo.isEmpty()) View.GONE else View.VISIBLE
         }
 
         // Only list what was actually done this session
@@ -64,7 +81,7 @@ class SummaryActivity : AppCompatActivity() {
             } else {
                 saveWorkoutToCloud(
                     curls, pushups, squats, situps, overhead, jacks, lunges, plank,
-                    calories, overallScore, leaderboardSwitch.isChecked
+                    calories, overallScore, durationSeconds, leaderboardSwitch.isChecked
                 )
             }
         }
@@ -84,9 +101,9 @@ class SummaryActivity : AppCompatActivity() {
     }
 
     private fun saveWorkoutToCloud(
-        curls: Int, pushups: Int, squats: Int, situps: Int, 
+        curls: Int, pushups: Int, squats: Int, situps: Int,
         overhead: Int, jacks: Int, lunges: Int, plank: Int,
-        calories: Double, score: Int, shouldShare: Boolean
+        calories: Double, score: Int, durationSeconds: Int, shouldShare: Boolean
     ) {
         val user = auth.currentUser
         if (user == null) {
@@ -107,6 +124,7 @@ class SummaryActivity : AppCompatActivity() {
             "plank" to plank,
             "calories" to calories,
             "overallScore" to score,
+            "durationSeconds" to durationSeconds,
             "sharedToLeaderboard" to shouldShare
         )
 
@@ -154,5 +172,7 @@ class SummaryActivity : AppCompatActivity() {
             .edit()
             .putLong("last_save_timestamp", System.currentTimeMillis())
             .apply()
+        // Keeps the streak reminder accurate before History has been reopened
+        Streaks.recordWorkoutToday(this)
     }
 }
