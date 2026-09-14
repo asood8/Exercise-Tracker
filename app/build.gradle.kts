@@ -95,4 +95,9 @@ dependencies {
     // App Check: Play Integrity in release builds, the debug provider in debug builds (see AppCheckSetup.kt)
     implementation("com.google.firebase:firebase-appcheck-playintegrity")
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
+
+    // Unit tests (src/test) run on the JVM, where Android's org.json is only a stub, so the real
+    // library is added for the routine tests
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

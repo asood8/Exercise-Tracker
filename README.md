@@ -1,5 +1,7 @@
 # AI Exercise Tracker
 
+[![CI](https://github.com/asood8/Exercise-Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/asood8/Exercise-Tracker/actions/workflows/ci.yml)
+
 An Android app that counts your reps through the phone's camera. Prop your phone up, start moving, and it tracks push-ups, squats, curls and five other exercises, scores your form on every rep, and estimates how many calories you burned. There's nothing to log by hand.
 
 Pose detection runs entirely on the device with [MediaPipe](https://developers.google.com/mediapipe), so no video ever leaves your phone.
@@ -123,12 +125,15 @@ You'll need a recent version of Android Studio and an Android phone running Andr
 
 To build from the command line instead, run `./gradlew assembleDebug` (or `gradlew.bat assembleDebug` on Windows). Gradle needs a JDK, so if `JAVA_HOME` isn't set, point it at the one bundled with Android Studio.
 
+Run the unit tests with `./gradlew test`. They cover the logic that doesn't need a camera: goal suggestions, routines, streaks (including daylight saving changes), levels, achievements, and the username and password rules. GitHub Actions runs them on every push, along with lint and a debug build, using a placeholder Firebase config.
+
 Release builds are minified with R8. To sign them, add `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD` to your user-level `~/.gradle/gradle.properties`, which lives outside the repo so the key and passwords are never committed. Without them the release APK is left unsigned.
 
 ## Getting good tracking
 
 - Put the phone far enough away that your whole body is in frame. Most trackers need to see everything from your shoulders down to your ankles.
 - The workout screen tells you where to put the phone for the exercise you picked. In general, face the camera for curls, overhead press, squats and jumping jacks, and set it up side-on for push-ups, sit-ups, planks and lunges.
+- For the side-on exercises, turn the phone sideways. The workout screen switches to landscape (tap the rotate button if auto-rotate is off), and your body fills much more of the frame.
 - Good, even lighting helps a lot. Backlighting from a window is the most common reason tracking drops out.
 - The status bar at the top turns green once the app has found you.
 

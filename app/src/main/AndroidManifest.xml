@@ -31,10 +31,13 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <!-- The workout screen can rotate, since side-on exercises fit a landscape frame better. It
+             handles rotation itself so the workout isn't restarted. -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="fullUser" />
 
         <activity
             android:name=".SummaryActivity"

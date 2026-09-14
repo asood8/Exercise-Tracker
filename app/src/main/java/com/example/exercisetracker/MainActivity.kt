@@ -2,11 +2,14 @@ package com.example.exercisetracker
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Typeface
+import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -63,6 +66,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var cameraExecutor: ExecutorService
 
     private var imageAnalyzer: ImageAnalysis? = null
+    private var preview: Preview? = null
     private var cameraProvider: ProcessCameraProvider? = null
 
     // Curl left/right labels depend on whether the frame was mirrored for the front camera
@@ -156,6 +160,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         activeExercise = plan?.blocks?.first()?.exercise ?: Exercise.fromName(intent.getStringExtra("EXERCISE"))
         calorieEstimator = CalorieEstimator(weightKg, heightCm / 100f, age, gender)
 
+        bindViews()
+        getSystemService(DisplayManager::class.java).registerDisplayListener(displayListener, null)
+
+        cameraExecutor = Executors.newSingleThreadExecutor()
+
+        if (allPermissionsGranted()) {
+            startInitialization()
+        } else {
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+        }
+    }
+
+    // Finds the views and wires up the controls. It runs again after a rotation: the activity handles
+    // rotation itself so the workout keeps going, and swaps in the portrait or landscape layout.
+    private fun bindViews() {
         viewFinder = findViewById(R.id.viewFinder)
         overlayView = findViewById(R.id.overlayView)
         alignmentStatus = findViewById(R.id.alignmentStatus)
@@ -170,35 +189,65 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         findViewById<Button>(R.id.backButton).setOnClickListener { finish() }
         findViewById<Button>(R.id.endTaskButton).setOnClickListener { endWorkout() }
         findViewById<ImageButton>(R.id.filterButton).setOnClickListener { showExerciseDialog() }
+        findViewById<ImageButton>(R.id.rotateButton).setOnClickListener { toggleOrientation() }
         soundButton.setOnClickListener { toggleSound() }
         pauseButton.setOnClickListener { onPauseButton() }
 
         // During setup, tapping the instructions skips the wait, e.g. if detection is being fussy
         liveStatsText.setOnClickListener { if (phase == Phase.SETUP) startCountdown() }
 
+        updateSoundIcon()
         render()
+    }
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        setContentView(R.layout.activity_main)
+        bindViews()
+        preview?.setSurfaceProvider(viewFinder.surfaceProvider)
+        updateTargetRotation()
+    }
 
-        if (allPermissionsGranted()) {
-            startInitialization()
-        } else {
-            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
-        }
+    // --- Rotation ---
+
+    // A 180° turn (from one landscape side to the other) isn't a configuration change, so the display
+    // is watched too. The camera's target rotation decides which way up frames reach the pose
+    // detector, and the trackers assume the person is upright in the frame.
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) = updateTargetRotation()
+    }
+
+    @Suppress("DEPRECATION") // Its replacement, Context.display, needs API 30
+    private fun displayRotation(): Int = windowManager.defaultDisplay.rotation
+
+    private fun updateTargetRotation() {
+        val rotation = displayRotation()
+        imageAnalyzer?.targetRotation = rotation
+        preview?.targetRotation = rotation
+    }
+
+    // The screen follows the phone when auto-rotate is on. This button works even when it's locked,
+    // and the SENSOR_ orientations still allow either way up.
+    private fun toggleOrientation() {
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        requestedOrientation = if (landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
     private fun toggleSound() {
         isSoundEnabled = !isSoundEnabled
-        if (isSoundEnabled) {
-            soundButton.setImageResource(android.R.drawable.ic_lock_silent_mode_off)
-            soundButton.setColorFilter(Color.WHITE)
-            Toast.makeText(this, "Coaching On", Toast.LENGTH_SHORT).show()
-        } else {
-            soundButton.setImageResource(android.R.drawable.ic_lock_silent_mode)
-            soundButton.setColorFilter(Color.RED)
-            tts?.stop()
-            Toast.makeText(this, "Coaching Off", Toast.LENGTH_SHORT).show()
-        }
+        updateSoundIcon()
+        if (!isSoundEnabled) tts?.stop()
+        Toast.makeText(this, if (isSoundEnabled) "Coaching On" else "Coaching Off", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateSoundIcon() {
+        soundButton.setImageResource(
+            if (isSoundEnabled) android.R.drawable.ic_lock_silent_mode_off else android.R.drawable.ic_lock_silent_mode
+        )
+        soundButton.setColorFilter(if (isSoundEnabled) Color.WHITE else Color.RED)
     }
 
     override fun onInit(status: Int) {
@@ -407,7 +456,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun render() {
         liveStatsText.text = when (phase) {
-            Phase.SETUP -> "Get ready: ${setupTitle()}\n\n${activeExercise.setupTip}\n\n" +
+            Phase.SETUP -> "Get ready: ${setupTitle()}\n\n${activeExercise.setupTip}\n\n${landscapeTip()}" +
                 "Starts when you're in view, or tap here to start now."
             Phase.COUNTDOWN -> bigText(countdownValue.toString())
             Phase.REST -> "Rest ${formatDuration(restRemaining)}\n\n${nextUpText()}\nTap ⏭ to skip the rest"
@@ -425,6 +474,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         renderPlan()
     }
+
+    // Side-on exercises fill much more of a landscape frame
+    private fun landscapeTip(): String =
+        if (activeExercise.sideOn && resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE) {
+            "Tip: turn the phone sideways for this one. If the screen doesn't turn, tap the rotate button.\n\n"
+        } else {
+            ""
+        }
 
     // The block being worked on, or null without a plan
     private fun currentBlock(): PlanStep? = plan?.blocks?.getOrNull(blockIndex)
@@ -730,8 +787,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also { it.setSurfaceProvider(viewFinder.surfaceProvider) }
+            val rotation = displayRotation()
+            val preview = Preview.Builder().setTargetRotation(rotation).build()
+                .also { it.setSurfaceProvider(viewFinder.surfaceProvider) }
+            this.preview = preview
             imageAnalyzer = ImageAnalysis.Builder()
+                .setTargetRotation(rotation)
                 .setTargetResolution(android.util.Size(320, 480))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
@@ -786,6 +847,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        getSystemService(DisplayManager::class.java).unregisterDisplayListener(displayListener)
         handler.removeCallbacksAndMessages(null)
         tts?.stop()
         tts?.shutdown()

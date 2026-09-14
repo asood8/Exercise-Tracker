@@ -568,7 +568,7 @@ class HomeActivity : AppCompatActivity() {
                 var totalReps = 0
                 var totalCalories = 0.0
                 var scoreSum = 0
-                var count = 0
+                var scoredCount = 0
 
                 for (document in documents) {
                     totalReps += (document.getLong("curls") ?: 0).toInt()
@@ -580,11 +580,15 @@ class HomeActivity : AppCompatActivity() {
                     totalReps += (document.getLong("lunges") ?: 0).toInt()
 
                     totalCalories += document.getDouble("calories") ?: 0.0
-                    scoreSum += (document.getLong("overallScore") ?: 0).toInt()
-                    count++
+                    // -1 means nothing was scored, so it's left out of the average, as on History
+                    val score = (document.getLong("overallScore") ?: -1L).toInt()
+                    if (score >= 0) {
+                        scoreSum += score
+                        scoredCount++
+                    }
                 }
 
-                val avgScore = if (count > 0) scoreSum / count else 0
+                val avgScore = if (scoredCount > 0) scoreSum / scoredCount else 0
 
                 findViewById<TextView>(R.id.quickTotalReps).text = totalReps.toString()
                 findViewById<TextView>(R.id.quickTotalCalories).text = totalCalories.toInt().toString()
