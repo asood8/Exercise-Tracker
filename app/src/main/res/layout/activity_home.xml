@@ -176,14 +176,70 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Shown to email accounts that haven't verified their address yet -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/verifyBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/purple_500"
+                app:strokeWidth="1dp"
+                app:layout_constraintTop_toBottomOf="@id/guestBanner">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Verify your email"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/verifyBannerText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="We sent you a verification link."
+                        android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/resendVerificationButton"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Resend link" />
+
+                        <Button
+                            android:id="@+id/checkVerificationButton"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="I've verified" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/usernameInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:hint="Username"
-                app:helperText="Shown on the leaderboard"
-                app:layout_constraintTop_toBottomOf="@id/guestBanner">
+                app:helperText="Shown on the leaderboard, and unique to you"
+                app:layout_constraintTop_toBottomOf="@id/verifyBanner">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/usernameInput"
@@ -346,21 +402,55 @@
                 android:id="@+id/exerciseLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Exercise"
+                android:text="Workout"
                 android:layout_marginTop="24dp"
                 android:textStyle="bold"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/genderGroup" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/workoutTypeToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:singleSelection="true"
+                app:selectionRequired="true"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/exerciseLabel">
+
+                <Button
+                    android:id="@+id/workoutTypeSingle"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="One exercise"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/workoutTypeRoutine"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Routine"
+                    android:textAllCaps="false" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <!-- One exercise, with an optional goal -->
+            <LinearLayout
+                android:id="@+id/singleSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                app:layout_constraintTop_toBottomOf="@id/workoutTypeToggle">
 
             <!-- Filled with one chip per exercise in HomeActivity -->
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/exerciseChips"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 app:singleSelection="true"
-                app:selectionRequired="true"
-                app:layout_constraintTop_toBottomOf="@id/exerciseLabel" />
+                app:selectionRequired="true" />
 
             <TextView
                 android:id="@+id/goalLabel"
@@ -368,9 +458,7 @@
                 android:layout_height="wrap_content"
                 android:text="Goal (optional)"
                 android:layout_marginTop="16dp"
-                android:textStyle="bold"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/exerciseChips" />
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/goalRow"
@@ -378,8 +466,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal"
-                app:layout_constraintTop_toBottomOf="@id/goalLabel">
+                android:orientation="horizontal">
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="0dp"
@@ -418,6 +505,82 @@
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
+            <!-- Suggested next goal, shown once past workouts have loaded -->
+            <LinearLayout
+                android:id="@+id/suggestionRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/suggestionText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#666666"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/useSuggestionButton"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Use" />
+            </LinearLayout>
+            </LinearLayout>
+
+            <!-- A multi-exercise routine -->
+            <LinearLayout
+                android:id="@+id/routineSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone"
+                app:layout_constraintTop_toBottomOf="@id/singleSection">
+
+                <!-- Filled with one chip per routine in HomeActivity -->
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/routineChips"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true" />
+
+                <TextView
+                    android:id="@+id/routineDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="4dp"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/newRoutineButton"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="New routine" />
+
+                    <Button
+                        android:id="@+id/deleteRoutineButton"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Delete"
+                        android:textColor="#FF5252"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
             <Button
                 android:id="@+id/nextButton"
                 android:layout_width="match_parent"
@@ -425,10 +588,40 @@
                 android:text="Start Workout"
                 android:textSize="18sp"
                 android:layout_marginTop="32dp"
-                android:layout_marginBottom="32dp"
+                app:layout_constraintBottom_toTopOf="@id/accountRow"
+                app:layout_constraintTop_toBottomOf="@id/routineSection"
+                app:layout_constraintVertical_bias="1.0"
+                app:layout_constraintVertical_chainStyle="packed" />
+
+            <!-- Account data: export everything, or delete the account -->
+            <LinearLayout
+                android:id="@+id/accountRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:gravity="center"
+                android:orientation="horizontal"
                 app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/goalRow"
-                app:layout_constraintVertical_bias="1.0" />
+                app:layout_constraintTop_toBottomOf="@id/nextButton">
+
+                <Button
+                    android:id="@+id/exportDataButton"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Download my data"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/deleteAccountButton"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Delete account"
+                    android:textAllCaps="false"
+                    android:textColor="#FF5252" />
+            </LinearLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>

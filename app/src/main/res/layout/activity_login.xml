@@ -49,13 +49,24 @@
             android:inputType="textPassword" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- Hidden in create-account mode -->
+    <Button
+        android:id="@+id/forgotPasswordButton"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Forgot password?"
+        android:textAllCaps="false"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/passwordInputLayout" />
+
     <Button
         android:id="@+id/loginButton"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:text="Login"
-        android:layout_marginTop="32dp"
-        app:layout_constraintTop_toBottomOf="@id/passwordInputLayout" />
+        android:text="Log in"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toBottomOf="@id/forgotPasswordButton" />
 
     <Button
         android:id="@+id/signUpButton"
@@ -72,7 +83,7 @@
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Skip &amp; Continue Offline"
+        android:text="Continue as guest"
         android:layout_marginBottom="32dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

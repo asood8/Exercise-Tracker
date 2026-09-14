@@ -87,12 +87,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var restRemaining = 0
     private var setupVisibleSinceMs = 0L
 
-    // Optional "3 × 15" goal from Home. Progress is measured from setBaseline, the exercise's count
-    // (or plank seconds) when the current set started.
-    private var goal: WorkoutGoal? = null
-    @Volatile private var setsCompleted = 0
-    @Volatile private var setBaseline = 0
-    @Volatile private var goalComplete = false
+    // Optional plan from Home: a routine, or a "3 × 15" goal (a one-step routine). blockIndex is the
+    // current block in plan.blocks, which is also how many are done. Progress in it is measured from
+    // blockBaseline, the exercise's count (or plank seconds) when the block started.
+    private var plan: Routine? = null
+    @Volatile private var blockIndex = 0
+    @Volatile private var blockBaseline = 0
+    @Volatile private var planComplete = false
+
+    // Exercises that got as far as tracking, so Summary can list them even if nothing was counted
+    private val usedExercises = linkedSetOf<Exercise>()
 
     // Duration runs from the first "Go" and leaves out paused time
     private var workoutStartMs = 0L
@@ -128,7 +132,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
         private const val SETUP_HOLD_MS = 1000L // How long the body must stay in view before the countdown
-        private const val REST_SECONDS = 60
 
         init {
             try {
@@ -149,12 +152,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val heightCm = intent.getFloatExtra("HEIGHT_CM", 168f)
         val age = intent.getIntExtra("AGE", 18)
         val gender = intent.getStringExtra("GENDER") ?: "male"
-        activeExercise = Exercise.fromName(intent.getStringExtra("EXERCISE"))
+        plan = Routine.fromJson(intent.getStringExtra("ROUTINE"))
+        activeExercise = plan?.blocks?.first()?.exercise ?: Exercise.fromName(intent.getStringExtra("EXERCISE"))
         calorieEstimator = CalorieEstimator(weightKg, heightCm / 100f, age, gender)
-
-        val goalSets = intent.getIntExtra("GOAL_SETS", 0)
-        val goalTarget = intent.getIntExtra("GOAL_TARGET", 0)
-        if (goalSets > 0 && goalTarget > 0) goal = WorkoutGoal(activeExercise, goalSets, goalTarget)
 
         viewFinder = findViewById(R.id.viewFinder)
         overlayView = findViewById(R.id.overlayView)
@@ -281,6 +281,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startTracking() {
         if (workoutStartMs == 0L) workoutStartMs = System.currentTimeMillis()
+        usedExercises.add(activeExercise)
         synchronized(trackerLock) { phase = Phase.TRACKING }
         speak("Go!", interrupt = true)
         render()
@@ -289,7 +290,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun onPauseButton() {
         when (phase) {
             Phase.PAUSED -> resume()
-            Phase.REST -> startCountdown() // Skip the rest of the break
+            Phase.REST -> endRest() // Skip the rest of the break
             else -> pause()
         }
     }
@@ -318,27 +319,36 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startRest() {
+        val p = plan ?: return
         if (phase != Phase.TRACKING) return
         handler.removeCallbacksAndMessages(null)
         synchronized(trackerLock) {
             plankTracker.finish()
             phase = Phase.REST
         }
-        restRemaining = REST_SECONDS
-        speak("Set $setsCompleted done. Take a break.", interrupt = false)
+        restRemaining = p.restSeconds
+        val next = p.blocks[blockIndex]
+        speak(if (p.isGoal) "Set $blockIndex done. Take a break." else "Nice. Next up: ${next.spoken()}.", interrupt = false)
         tickRest()
     }
 
     private fun tickRest() {
         if (phase != Phase.REST) return
         if (restRemaining <= 0) {
-            startCountdown()
+            endRest()
             return
         }
         if (restRemaining == 10) speak("10 seconds", interrupt = true)
         render()
         restRemaining--
         handler.postDelayed({ tickRest() }, 1000)
+    }
+
+    // The next block starts after a countdown if it's the same exercise. A new exercise gets the setup
+    // check first, since the phone may need moving.
+    private fun endRest() {
+        val next = currentBlock()?.exercise
+        if (next != null && next != activeExercise) switchExercise(next) else startCountdown()
     }
 
     // Result thread: start the countdown once the body has been in view for a moment
@@ -375,18 +385,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         spokenValue = value
     }
 
-    // Result thread: finish a set when its target is reached, then rest or wrap up the goal
-    private fun checkGoal(exercise: Exercise) {
-        val g = goal ?: return
-        if (goalComplete || exercise != g.exercise) return
-        if (progressValue(exercise) - setBaseline < g.target) return
+    // Result thread: finish a block when its target is reached, then rest or wrap up the plan
+    private fun checkPlan(exercise: Exercise) {
+        val p = plan ?: return
+        if (planComplete) return
+        val block = p.blocks[blockIndex]
+        if (exercise != block.exercise || progressValue(exercise) - blockBaseline < block.target) return
 
-        setsCompleted++
-        setBaseline = progressValue(exercise)
-        if (setsCompleted >= g.sets) {
-            goalComplete = true
-            speak("Goal complete!", interrupt = false)
+        if (blockIndex + 1 >= p.blocks.size) {
+            planComplete = true
+            speak(if (p.isGoal) "Goal complete!" else "Routine complete!", interrupt = false)
         } else {
+            // Counts don't change during the rest, so the next block's baseline can be taken now
+            blockBaseline = progressValue(p.blocks[blockIndex + 1].exercise)
+            blockIndex++
             runOnUiThread { startRest() }
         }
     }
@@ -395,11 +407,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun render() {
         liveStatsText.text = when (phase) {
-            Phase.SETUP -> "Get ready: ${activeExercise.displayName}\n\n${activeExercise.setupTip}\n\n" +
+            Phase.SETUP -> "Get ready: ${setupTitle()}\n\n${activeExercise.setupTip}\n\n" +
                 "Starts when you're in view, or tap here to start now."
             Phase.COUNTDOWN -> bigText(countdownValue.toString())
-            Phase.REST -> "Rest ${formatDuration(restRemaining)}\n\nNext: set ${setsCompleted + 1} of ${goal?.sets}\n" +
-                "Tap ⏭ to skip the rest"
+            Phase.REST -> "Rest ${formatDuration(restRemaining)}\n\n${nextUpText()}\nTap ⏭ to skip the rest"
             Phase.PAUSED -> "Paused\n\nTap ▶ to resume"
             Phase.TRACKING -> lastStats.ifBlank { activeExercise.setupTip }
         }
@@ -412,20 +423,46 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pauseButton.setImageResource(icon)
         pauseButton.contentDescription = description
 
-        renderGoal()
+        renderPlan()
     }
 
-    private fun renderGoal() {
-        val g = goal
-        if (g == null || activeExercise != g.exercise) {
+    // The block being worked on, or null without a plan
+    private fun currentBlock(): PlanStep? = plan?.blocks?.getOrNull(blockIndex)
+
+    // "Sit-ups × 15 · round 2 of 3" when the routine's current block is this exercise
+    private fun setupTitle(): String {
+        val p = plan
+        val block = currentBlock()
+        if (p == null || block == null || p.isGoal || planComplete || block.exercise != activeExercise) {
+            return activeExercise.displayName
+        }
+        return "${block.describe()} · round ${p.roundOf(blockIndex)} of ${p.rounds}"
+    }
+
+    private fun nextUpText(): String {
+        val p = plan ?: return ""
+        val block = currentBlock() ?: return ""
+        return if (p.isGoal) "Next: set ${blockIndex + 1} of ${p.rounds}"
+        else "Next: ${block.describe()}\nRound ${p.roundOf(blockIndex)} of ${p.rounds}"
+    }
+
+    // The progress ring shows the current block, while its exercise is the one being tracked
+    private fun renderPlan() {
+        val p = plan
+        val block = currentBlock()
+        if (p == null || block == null || (activeExercise != block.exercise && !planComplete)) {
             goalPanel.visibility = View.GONE
             return
         }
         goalPanel.visibility = View.VISIBLE
-        val done = if (goalComplete) g.target else (progressValue(g.exercise) - setBaseline).coerceIn(0, g.target)
-        goalRing.setProgressCompat(done * 100 / g.target, true)
-        goalRingText.text = if (g.exercise.isTimed) "$done/${g.target}s" else "$done/${g.target}"
-        goalSetText.text = if (goalComplete) "Goal complete ✓" else "Set ${setsCompleted + 1} of ${g.sets}"
+        val done = if (planComplete) block.target else (progressValue(block.exercise) - blockBaseline).coerceIn(0, block.target)
+        goalRing.setProgressCompat(done * 100 / block.target, true)
+        goalRingText.text = if (block.exercise.isTimed) "$done/${block.target}s" else "$done/${block.target}"
+        goalSetText.text = when {
+            planComplete -> if (p.isGoal) "Goal complete ✓" else "Routine complete ✓"
+            p.isGoal -> "Set ${blockIndex + 1} of ${p.rounds}"
+            else -> "${block.exercise.displayName}\nRound ${p.roundOf(blockIndex)} of ${p.rounds}"
+        }
     }
 
     private fun bigText(text: String): CharSequence = SpannableString(text).apply {
@@ -457,17 +494,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildSummaryIntent(durationSeconds: Int): Intent {
-        val allReps = mutableListOf<RepResult>()
-        allReps.addAll(curlsTracker.sessionReps)
-        allReps.addAll(pushUpTracker.sessionReps)
-        allReps.addAll(squatTracker.sessionReps)
-        allReps.addAll(situpTracker.sessionReps)
-        allReps.addAll(overheadTracker.sessionReps)
-        allReps.addAll(jumpingJackTracker.sessionReps)
-        allReps.addAll(lungeTracker.sessionReps)
         // Close out a plank that's still being held so it gets scored too
         plankTracker.finish()
-        allReps.addAll(plankTracker.sessionReps)
+        val repsByExercise = listOf(
+            Exercise.PUSHUPS to pushUpTracker.sessionReps,
+            Exercise.SQUATS to squatTracker.sessionReps,
+            Exercise.SITUPS to situpTracker.sessionReps,
+            Exercise.LUNGES to lungeTracker.sessionReps,
+            Exercise.CURLS to curlsTracker.sessionReps,
+            Exercise.OVERHEAD to overheadTracker.sessionReps,
+            Exercise.JACKS to jumpingJackTracker.sessionReps,
+            Exercise.PLANK to plankTracker.sessionReps
+        ).flatMap { (exercise, reps) -> reps.map { exercise to it } }
+        val allReps = repsByExercise.map { it.second }
 
         // Nothing scored this session (e.g. only a very short plank) is N/A rather than 0%
         val overallScore = if (allReps.isEmpty()) -1 else allReps.map { it.score }.average().toInt()
@@ -484,11 +523,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .take(3)
             .map { it.first }
 
-        val feedbackSummary = if (topFeedback.isEmpty()) "Form: Excellent! Keep it up."
-                              else "Top issues: " + topFeedback.joinToString(", ")
+        val feedbackSummary = when {
+            allReps.isEmpty() -> "No reps were scored, so there's no form feedback this time."
+            topFeedback.isEmpty() -> "Form: Excellent! Keep it up."
+            else -> "Top issues: " + topFeedback.joinToString(", ")
+        }
 
-        val goalSummary = goal?.let { g ->
-            "Goal ${g.describe()}: " + if (goalComplete) "complete" else "$setsCompleted of ${g.sets} sets"
+        val blocksDone = plan?.let { if (planComplete) it.blocks.size else blockIndex } ?: 0
+        val planSummary = plan?.let { p ->
+            if (p.isGoal) "Goal ${p.describe()}: " + if (planComplete) "complete" else "$blocksDone of ${p.rounds} sets"
+            else "${p.name}: " + if (planComplete) "complete" else "$blocksDone of ${p.blocks.size} sets done"
         }
 
         return Intent(this, SummaryActivity::class.java).apply {
@@ -504,7 +548,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra("OVERALL_SCORE", overallScore)
             putExtra("FEEDBACK_SUMMARY", feedbackSummary)
             putExtra("DURATION", durationSeconds)
-            putExtra("GOAL_SUMMARY", goalSummary)
+            putExtra("GOAL_SUMMARY", planSummary)
+            // Rep-by-rep details for the review on Summary, as parallel lists
+            putStringArrayListExtra("REP_EXERCISES", ArrayList(repsByExercise.map { it.first.name }))
+            putExtra("REP_SCORES", allReps.map { it.score }.toIntArray())
+            putExtra("REP_SECONDS", allReps.map { it.seconds }.toIntArray())
+            putStringArrayListExtra("REP_ISSUES", ArrayList(allReps.map { it.feedback.joinToString(" · ") }))
+            putStringArrayListExtra("EXERCISES_USED", ArrayList(usedExercises.map { it.name }))
+            // What the plan was, so it's saved with the workout. Goals feed the next goal suggestion.
+            plan?.let { p ->
+                if (p.isGoal) {
+                    putExtra("GOAL_EXERCISE", p.steps.first().exercise.name)
+                    putExtra("GOAL_SETS", p.rounds)
+                    putExtra("GOAL_TARGET", p.steps.first().target)
+                    putExtra("GOAL_SETS_DONE", blocksDone)
+                } else {
+                    putExtra("ROUTINE_NAME", p.name)
+                }
+            }
         }
     }
 
@@ -605,7 +666,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (phase == Phase.SETUP) checkSetup(pose, exercise)
         if (tracking) {
             announceProgress(exercise)
-            checkGoal(exercise)
+            checkPlan(exercise)
         }
 
         val currentTime = System.currentTimeMillis()

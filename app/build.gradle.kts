@@ -22,13 +22,29 @@ android {
         }
     }
 
+    // Release signing details come from ~/.gradle/gradle.properties, outside the repo, so no keys or
+    // passwords are ever committed. Without them, release builds are left unsigned.
+    val releaseStoreFile = providers.gradleProperty("RELEASE_STORE_FILE").orNull
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = providers.gradleProperty("RELEASE_STORE_PASSWORD").orNull
+                keyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull
+                keyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").orNull
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (releaseStoreFile != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -75,5 +91,8 @@ dependencies {
     // Firebase SDKs
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-analytics")
+
+    // App Check: Play Integrity in release builds, the debug provider in debug builds (see AppCheckSetup.kt)
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
 }

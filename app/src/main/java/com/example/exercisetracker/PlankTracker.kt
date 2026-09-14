@@ -82,7 +82,7 @@ class PlankTracker {
         if (pikeFrames > totalFrames / 4) repFeedback.add("Hips too high!")
 
         lastRepScore = score
-        sessionReps.add(RepResult("Plank", score, repFeedback))
+        sessionReps.add(RepResult("Plank", score, repFeedback, seconds = (holdMs / 1000).toInt()))
     }
 
     private fun checkForm(landmarks: List<NormalizedLandmark>): Boolean {

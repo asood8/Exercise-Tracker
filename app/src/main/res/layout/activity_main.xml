@@ -123,6 +123,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
+            android:gravity="center"
             android:text="Set 1 of 3"
             android:textColor="@android:color/white"
             android:textSize="14sp" />

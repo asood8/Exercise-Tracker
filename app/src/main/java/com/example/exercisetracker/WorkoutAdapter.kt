@@ -10,6 +10,7 @@ import com.google.firebase.firestore.Exclude
 import java.text.SimpleDateFormat
 import java.util.*
 
+@androidx.annotation.Keep // Firestore fills this in by reflection, so R8 must keep its fields
 data class Workout(
     val id: String = "",
     val curls: Int = 0,
@@ -23,6 +24,9 @@ data class Workout(
     val calories: Double = 0.0,
     val overallScore: Int = 0,
     val durationSeconds: Int = 0, // 0 for workouts saved before durations were recorded
+    val sharedToLeaderboard: Boolean = false,
+    val routine: String? = null, // Name of the routine followed, if any
+    val edited: Boolean = false, // Counts were corrected by hand on the Summary screen
     val timestamp: com.google.firebase.Timestamp? = null
 ) {
     // Rep-based exercises only; plank is time-based
@@ -56,6 +60,7 @@ class WorkoutAdapter(
         holder.dateText.text = dateStr
 
         val details = mutableListOf<String>()
+        workout.routine?.let { details.add("Routine: $it") }
         if (workout.curls > 0) details.add("Curls: ${workout.curls}")
         if (workout.pushups > 0) details.add("Pushups: ${workout.pushups}")
         if (workout.squats > 0) details.add("Squats: ${workout.squats}")
@@ -66,6 +71,7 @@ class WorkoutAdapter(
         if (workout.plank > 0) details.add("Plank: ${formatPlankTime(workout.plank)}")
         if (workout.durationSeconds > 0) details.add("Time: ${formatDuration(workout.durationSeconds)}")
         details.add("Calories: %.1f".format(workout.calories))
+        if (workout.edited) details.add("Counts edited")
 
         holder.detailsText.text = details.joinToString(", ")
         holder.scoreText.text = if (workout.overallScore == -1) "Score: N/A" else "Score: ${workout.overallScore}%"

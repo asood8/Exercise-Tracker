@@ -24,6 +24,13 @@ object LevelingUtils {
         return xpAtNextLevel - xpAtStartOfLevel
     }
 
+    // XP for one saved workout: 10 per rep (plank counts one rep per 10 seconds), scaled by the form
+    // score. Workouts without a score count at half value.
+    fun xpForWorkout(workout: Workout): Int {
+        val quality = if (workout.overallScore == -1) 0.5 else workout.overallScore / 100.0
+        return ((workout.totalReps + workout.plank / 10) * 10 * quality).toInt()
+    }
+
     // Hexagon Stat Formulas (Muscle Group Progression)
     // 0: Arms, 1: Chest, 2: Legs, 3: Abs, 4: Shoulders, 5: Back
     fun getMuscleProgress(reps: Int): Float {

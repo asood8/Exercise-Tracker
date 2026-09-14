@@ -4,9 +4,13 @@
     <uses-feature android:name="android.hardware.camera" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Checks for a connection before saving to the leaderboard or deleting an account -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Backups are off so the saved sign-in and profile can't be copied off the phone -->
     <application
-        android:allowBackup="true"
+        android:name=".ExerciseTrackerApp"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:extractNativeLibs="true"

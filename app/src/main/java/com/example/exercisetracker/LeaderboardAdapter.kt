@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
+@androidx.annotation.Keep // Firestore fills this in by reflection, so R8 must keep its fields
 data class UserStats(
     val userId: String = "",
     val username: String = "",

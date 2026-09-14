@@ -3,7 +3,8 @@ package com.example.exercisetracker
 data class RepResult(
     val exerciseName: String,
     val score: Int, // 0 to 100
-    val feedback: List<String> = emptyList()
+    val feedback: List<String> = emptyList(),
+    val seconds: Int = 0 // Length of a plank hold; 0 for rep-based exercises
 )
 
 // Rejects "reps" that finish faster than anyone could really do them, which is usually landmark jitter

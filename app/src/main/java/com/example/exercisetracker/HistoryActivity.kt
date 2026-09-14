@@ -21,6 +21,8 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
@@ -101,8 +103,20 @@ class HistoryActivity : AppCompatActivity() {
             .delete()
             .addOnSuccessListener {
                 Toast.makeText(this, "Workout deleted", Toast.LENGTH_SHORT).show()
+                if (workout.sharedToLeaderboard) removeFromLeaderboard(workout)
                 fetchLifetimeStats()
             }
+    }
+
+    // Takes a deleted workout's reps and calories back off the leaderboard totals it was added to
+    private fun removeFromLeaderboard(workout: Workout) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).update(
+            mapOf(
+                "totalReps" to FieldValue.increment(-workout.totalReps.toLong()),
+                "totalCalories" to FieldValue.increment(-workout.calories)
+            )
+        )
     }
 
     private fun setupNavigation() {
@@ -190,7 +204,10 @@ class HistoryActivity : AppCompatActivity() {
                 val workoutDays = mutableSetOf<Long>()
 
                 for (doc in documents) {
-                    val workout = doc.toObject(Workout::class.java).copy(id = doc.id)
+                    // A workout saved offline has no server timestamp yet, so use the local estimate
+                    // to keep it dated and counted in streaks until it uploads
+                    val workout = doc.toObject(Workout::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                        .copy(id = doc.id)
                     workoutList.add(workout)
 
                     totalCurls += workout.curls
@@ -210,10 +227,7 @@ class HistoryActivity : AppCompatActivity() {
                         validScoreCount++
                     }
 
-                    val qualityFactor = if (workout.overallScore == -1) 0.5 else workout.overallScore / 100.0
-                    // Plank counts as one rep per 10 seconds held
-                    val sessionReps = workout.totalReps + workout.plank / 10
-                    totalXp += (sessionReps * 10 * qualityFactor).toInt()
+                    totalXp += LevelingUtils.xpForWorkout(workout)
 
                     workout.timestamp?.let { workoutDays.add(Streaks.dayNumber(it.toDate().time)) }
                 }
@@ -224,6 +238,7 @@ class HistoryActivity : AppCompatActivity() {
                 val avgScore = if (validScoreCount > 0) scoreSum / validScoreCount else 0
 
                 updateLevelUI(totalXp)
+                syncLeaderboardLevel(user.uid, LevelingUtils.getLevelFromXp(totalXp))
 
                 val currentStreak = Streaks.current(workoutDays)
                 val longestStreak = Streaks.longest(workoutDays)
@@ -278,6 +293,18 @@ class HistoryActivity : AppCompatActivity() {
                 findViewById<TextView>(R.id.totalCalories).text = "Total Calories: %.1f kcal".format(totalCalories)
                 findViewById<TextView>(R.id.avgQualityScore).text = "Avg Quality Score: $avgScore%"
             }
+    }
+
+    // Keeps the leaderboard's level in step with this screen, e.g. after a workout that wasn't
+    // shared, or a deleted one. update() fails harmlessly for users who never opted into the
+    // leaderboard, so it can't create an entry. The last level sent is cached so this only writes
+    // when the level actually changes.
+    private fun syncLeaderboardLevel(uid: String, level: Int) {
+        val prefs = getSharedPreferences("LeaderboardPrefs", Context.MODE_PRIVATE)
+        val key = "level_$uid"
+        if (prefs.getInt(key, -1) == level) return
+        db.collection("users").document(uid).update("level", level)
+            .addOnCompleteListener { prefs.edit().putInt(key, level).apply() }
     }
 
     private fun showAchievements(uid: String, stats: AchievementStats) {

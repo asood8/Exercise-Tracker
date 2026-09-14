@@ -74,5 +74,10 @@ object Streaks {
         prefs(context).edit().putBoolean(KEY_REMINDERS, enabled).apply()
     }
 
+    // Used when an account is deleted
+    fun clear(context: Context) {
+        prefs(context).edit().clear().apply()
+    }
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
