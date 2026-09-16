@@ -16,3 +16,4 @@ local.properties
 app/google-services.json
 .idea/deploymentTargetSelector.xml
 .idea/deviceManager.xml
+.idea/appInsightsSettings.xml

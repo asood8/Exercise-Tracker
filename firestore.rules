@@ -1,0 +1,52 @@
+// Cloud Firestore security rules for the app's three collections. Nothing is writable without a
+// signed-in account, and the rules, not the app, decide what a signed-in account may write.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // A leaderboard name must be claimed by the writer in /usernames
+    function ownsUsername(name) {
+      return get(/databases/$(database)/documents/usernames/$(name.lower())).data.uid == request.auth.uid;
+    }
+
+    function validEntry() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['username', 'totalReps', 'totalCalories', 'lastActive', 'level'])
+        && (!d.keys().hasAny(['username'])
+            || (d.username is string && d.username.size() <= 20 && ownsUsername(d.username)))
+        && d.get('totalReps', 0) is int && d.get('totalReps', 0) >= 0
+        && d.get('totalCalories', 0) is number
+        && d.get('level', 1) is int && d.get('level', 1) <= 100;
+    }
+
+    // Saved workouts, private to the account that saved them
+    match /workouts/{workoutId} {
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Leaderboard entries: readable by anyone signed in, and capped so totals can't jump
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow delete: if isOwner(userId);
+      allow create: if isOwner(userId) && validEntry()
+        && request.resource.data.get('totalReps', 0) <= 2000;
+      allow update: if isOwner(userId) && validEntry()
+        && request.resource.data.get('totalReps', 0) - resource.data.get('totalReps', 0) <= 2000;
+    }
+
+    // Unique usernames: the doc id is the lowercase name, owned by one account
+    match /usernames/{name} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && name == name.lower() && name.size() >= 3 && name.size() <= 20;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}
